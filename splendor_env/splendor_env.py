@@ -66,7 +66,6 @@ for i in SplendorActionType:
 for i in range(12):
     SPLENDOR_ACTIONS.append((SplendorActionType.BUY_CARD, (i % 4, i // 4)))
     count_actions[SplendorActionType.BUY_CARD] += 1
-    print(len(SPLENDOR_ACTIONS)-1, SPLENDOR_ACTIONS[-1])
 
 for i in range(3):
     SPLENDOR_ACTIONS.append((SplendorActionType.BUY_RESERVED_CARD, i))
@@ -76,7 +75,6 @@ for i in range(64):
     if SplendorGem(i).count_types() == 3 and SplendorGem(i) & SplendorGem.GOLD != SplendorGem.GOLD:
         SPLENDOR_ACTIONS.append((SplendorActionType.TAKE_3_GEMS, SplendorGem(i)))
         count_actions[SplendorActionType.TAKE_3_GEMS] += 1
-        print(len(SPLENDOR_ACTIONS)-1, SPLENDOR_ACTIONS[-1])
 
 for i in range(5):
     SPLENDOR_ACTIONS.append((SplendorActionType.TAKE_2_GEMS, SplendorGem.gem_index(i)))
@@ -100,7 +98,7 @@ for i in range(6):
 
 print(count_actions)
 print(len(SPLENDOR_ACTIONS))
-
+quit()
     
 class SplendorEnv(Env):
     def __init__(self):
