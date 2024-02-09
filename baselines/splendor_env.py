@@ -96,94 +96,180 @@ for i in range(6):
     count_actions[SplendorActionType.DISCARD_GEM] += 1
 
 
-print(count_actions)
-print(len(SPLENDOR_ACTIONS))
-quit()
+#print(count_actions)
+#print(len(SPLENDOR_ACTIONS))
+
+from sklearn import preprocessing
+
     
 class SplendorEnv(Env):
+
     def __init__(self):
         self.action_space = spaces.Discrete(len(SPLENDOR_ACTIONS))
         self.observation_space = spaces.Dict({
             
             "action_state": spaces.Discrete(4),
-            "action_mask": spaces.Box(low=0, high=1, shape=(len(SPLENDOR_ACTIONS),)),
-            "player_gems": spaces.Box(low=0, high=9, shape=(4,6)), 
-            "cards_options": spaces.Dict({
-                "card_cost": spaces.Box(low=0, high=10, shape=(4,3,5)), 
-                "card_type": spaces.Box(low=0, high=5, shape=(4, 3)),
-                "card_points": spaces.Box(low=0, high=7, shape=(4, 3)),
-                "card_tier": spaces.Box(low=0, high=3, shape=(4,3)),
-            }),
-            "nobles_options": spaces.Dict({
-                "noble_cost": spaces.Box(low=0, high=10, shape=(5,5)),
-                "noble_points": spaces.Box(low=0, high=7, shape=(5,))
-            }),
-            "player_engine": spaces.Box(low=0, high=25, shape=(5,4)),
-            "player_cards": spaces.Dict({
-                #"card_cost": spaces.Box(low=0, high=10, shape=(4,27,5)), 
-                #"card_type": spaces.Box(low=0, high=5, shape=(4, 27)),
-                "card_points": spaces.Box(low=0, high=7, shape=(4, 27)),
-                #"card_tier": spaces.Box(low=0, high=3, shape=(4, 27)),
-            }),
-            "player_reserved": spaces.Dict({
-                "card_cost": spaces.Box(low=0, high=10, shape=(4,3,5)), 
-                "card_type": spaces.Box(low=0, high=5, shape=(4, 3)),
-                "card_points": spaces.Box(low=0, high=7, shape=(4, 3)),
-                "card_tier": spaces.Box(low=0, high=3, shape=(4, 3)),
-            }),         
-            "player_points": spaces.Box(low=0, high=15, shape=(4,)),
-            "cards_details": spaces.Dict({
-                "card_cost": spaces.Box(low=0, high=10, shape=(5,90)),
-                "card_type": spaces.Box(low=0, high=5, shape=(90,)),
-                "card_points": spaces.Box(low=0, high=7, shape=(90,)),
-                "card_tier": spaces.Box(low=0, high=3, shape=(90,)),
-                "card_purchased": spaces.Box(low=0, high=5, shape=(90,)), # 0 - Available Purchase, 1 - Purchased by Current Player, 2 - Reserved by Current Player, 3 - Other Players Purchased, 4 - Other Players Reserved, 5 - Not Seen
-            }),
+            "action_mask": spaces.Box(low=0, high=1, shape=(len(SPLENDOR_ACTIONS),), dtype=np.uint8),
+            "player_gems": spaces.Box(low=0, high=9, shape=(4,6), dtype=np.uint8), 
+
+            "options_card_cost": spaces.Box(low=0, high=10, shape=(3,4,5), dtype=np.uint8), 
+            "options_card_type": spaces.Box(low=0, high=5, shape=(3, 4), dtype=np.uint8),
+            "options_card_points": spaces.Box(low=0, high=7, shape=(3, 4), dtype=np.uint8),
+            "options_card_tier": spaces.Box(low=0, high=3, shape=(3,4), dtype=np.uint8),
+
+            "noble_cost": spaces.Box(low=0, high=10, shape=(5,5), dtype=np.uint8),
+            "noble_points": spaces.Box(low=0, high=7, shape=(5,), dtype=np.uint8),
+
+            "player_engine": spaces.Box(low=0, high=25, shape=(4,5), dtype=np.uint8),
+
+            "player_card_cost": spaces.Box(low=0, high=10, shape=(4,27,5), dtype=np.uint8), 
+            "player_card_type": spaces.Box(low=0, high=5, shape=(4, 27), dtype=np.uint8),
+            "player_card_points": spaces.Box(low=0, high=7, shape=(4, 27), dtype=np.uint8),
+            "player_card_tier": spaces.Box(low=0, high=3, shape=(4, 27), dtype=np.uint8),
+
+            "reserved_card_cost": spaces.Box(low=0, high=10, shape=(4,3,5), dtype=np.uint8), 
+            "reserved_card_type": spaces.Box(low=0, high=5, shape=(4, 3), dtype=np.uint8),
+            "reserved_card_points": spaces.Box(low=0, high=7, shape=(4, 3), dtype=np.uint8),
+            "reserved_card_tier": spaces.Box(low=0, high=3, shape=(4, 3), dtype=np.uint8),
+      
+            "player_points": spaces.Box(low=0, high=15, shape=(4,), dtype=np.uint8),
+
+            "all_card_cost": spaces.Box(low=0, high=10, shape=(90,5), dtype=np.uint8),
+            "all_card_type": spaces.Box(low=0, high=5, shape=(90,), dtype=np.uint8),
+            "all_card_points": spaces.Box(low=0, high=7, shape=(90,), dtype=np.uint8),
+            "all_card_tier": spaces.Box(low=0, high=3, shape=(90,), dtype=np.uint8),
+            #"all_card_purchased": spaces.Box(low=0, high=5, shape=(90,)), # 0 - Available Purchase, 1 - Purchased by Current Player, 2 - Reserved by Current Player, 3 - Other Players Purchased, 4 - Other Players Reserved, 5 - Not Seen
+
 
         })
-        self.game_state = None
+        self.player_num = None
+        self.game_state = SplendorGameState()
         self.seed = None
         self.last_obs = None
+        self.games_played = []
+
+        self.reset(None)
 
     def get_obs(self):
+
+        action_state_obs = self.game_state.get_action_state_obs()
+        action_mask_obs = self.game_state.get_action_mask_obs()
+        player_gems_obs = self.game_state.get_player_gems_obs()
+        card_options_obs = self.game_state.get_card_options_obs()
+        noble_options_obs = self.game_state.get_noble_options_obs()
+        player_engine_obs = self.game_state.get_player_engine_obs()
+        player_cards_obs = self.game_state.get_player_cards_obs()
+        reserved_cards_obs = self.game_state.get_reserved_cards_obs()
+        player_points_obs = self.game_state.get_player_points_obs()
+        card_details_obs = self.game_state.get_cards_details_obs()
+
         return {
-            "action_state": self.game_state.action_state.value,
-            "action_mask": self.game_state.get_action_mask_obs(),
-            "player_gems": self.game_state.get_player_gems_obs(),
-            "other_player_gems": self.game_state.get_other_player_gems_obs(),
-            "card_cost": self.game_state.get_card_cost_obs(),
-            "card_points": self.game_state.get_card_points_obs(),
-            "card_type": self.game_state.get_card_types_obs(),
-            "card_purchasable": self.game_state.get_card_purchasable_obs(),
-            "player_purchasing_power": self.game_state.get_player_purchasing_power_obs(),
-            "player_cards": self.game_state.get_player_cards_obs(),
-            "player_reserved_cards": self.game_state.get_player_reserved_cards(),
-            "other_player_reserved_cards": self.game_state.get_other_player_reserved_cards(),
-            "other_player1_cards": self.game_state.get_other_player_cards_obs(1),
-            "other_player2_cards": self.game_state.get_other_player_cards_obs(2),
-            "other_player3_cards": self.game_state.get_other_player_cards_obs(3),
-            "nobles": self.game_state.get_nobsles_obs(),
-            "player_points": self.game_state.get_player_points_obs(),
-            "cards_details": self.game_state.get_card_details_obs(),
+            "action_state": action_state_obs,
+            "action_mask": action_mask_obs,
+            "player_gems": player_gems_obs, 
+
+            "options_card_cost": card_options_obs["card_cost"], 
+            "options_card_type": card_options_obs["card_type"],
+            "options_card_points": card_options_obs["card_points"],
+            "options_card_tier": card_options_obs["card_tier"],
+
+            "noble_cost": noble_options_obs["noble_cost"],
+            "noble_points": noble_options_obs["noble_points"],
+
+            "player_engine": player_engine_obs,
+
+            "player_card_cost": player_cards_obs["card_cost"], 
+            "player_card_type": player_cards_obs["card_type"], 
+            "player_card_points": player_cards_obs["card_points"], 
+            "player_card_tier": player_cards_obs["card_tier"], 
+
+            "reserved_card_cost": reserved_cards_obs["card_cost"], 
+            "reserved_card_type": reserved_cards_obs["card_type"], 
+            "reserved_card_points": reserved_cards_obs["card_points"], 
+            "reserved_card_tier": reserved_cards_obs["card_tier"], 
+      
+            "player_points": player_points_obs,
+
+            "all_card_cost": card_details_obs["card_cost"], 
+            "all_card_type": card_details_obs["card_type"], 
+            "all_card_points": card_details_obs["card_points"], 
+            "all_card_tier": card_details_obs["card_tier"], 
         }
 
     def step(self, action):
 
-        if self.last_obs["action_mask"][action] == 1:
-            reward = self.game_state.take_action(action)
-        else:
-            reward = -100
+        assert self.game_state.done == False, "Game is Over"
+        assert self.player_num == self.game_state.current_player, f"Player {self.player_num} is not the current player {self.game_state.current_player}"
+
+
+        if self.last_obs["action_mask"][action] != 1:
+            return self.last_obs, -1000, False, self.game_state.done, {}
+
+        current_eval = self.game_state.blend_eval(self.player_num)
+
+        self.game_state.take_action(action)
+
+
+        while self.game_state.current_player != self.player_num:
+            
+            if self.game_state.done:
+                break
+
+            i = self.predict()
+            self.game_state.take_action(i, skip_random=True)
+
 
         self.last_obs = self.get_obs()
-
-        done = self.game_state.is_game_over()
-        truncated = self.game_state.is_turn_limit()
         info = {}
 
-        return self.last_obs, reward, truncated, done, info
+        new_eval = self.game_state.blend_eval(self.player_num)
 
-    def reset(self,seed=None):
+        reward = (new_eval - current_eval)/30
+        return self.last_obs, reward, self.game_state.done, self.game_state.done, info
+
+    def predict(self):
+
+        action_choice = [i for i, a in enumerate(self.game_state.action_mask) if a == 1]
+        i = random.choice(action_choice)
+        return i
+
+    def reset(self,seed=None, options=None):
+        #print("env reset")
+        
+        if self.game_state.done == True and self.player_num is not None:
+            
+
+            winners = self.game_state.get_winner()
+            if self.player_num in winners:
+                if len(winners) == 1:
+                    self.games_played.append(1)
+                else:
+                    self.games_played.append(1/len(winners))
+            else:
+                self.games_played.append(0)
+
+            if len(self.games_played) >= 250:
+                self.games_played.pop(0)
+            
+                print(f"WIN RATE: {sum(self.games_played)/250}")
+
+
+
+        random.seed(seed)
         self.seed = seed
+        self.game_state.reset(seed)
+
+        self.player_num = random.choice([0,1,2,3])
+
+        while self.game_state.current_player != self.player_num:
+            
+            if self.game_state.done:
+                break
+
+            i = self.predict()
+            self.game_state.take_action(i, skip_random=True)
+
+
         self.last_obs = self.get_obs()
         return self.last_obs, {}
 
@@ -506,6 +592,7 @@ class SplendorGameState():
     def __init__(self):
         self.action_state = SplendorActionState.TAKE_TURN
         self.players = [Player(), Player(), Player(), Player()]
+        self.players_turns = (0,0,0,0)
         self.current_player = 0
         self.tier_1_deck = []
         self.tier_2_deck = []
@@ -520,16 +607,26 @@ class SplendorGameState():
         self.count_no_action = 0
         self.probability = 1
         self.action_list = []
+        self.done = False
     
     def is_game_over(self):
+
+        if self.done:
+            return True
         vps = [p.get_victory_points() >= 15 for p in self.players]
-        return any(vps) or self.action_state == SplendorActionState.GAME_OVER
+        max_turns = max(self.players_turns)
+        all_turns = [p >= max_turns for p in self.players_turns]
+        if (any(vps) and all(all_turns)) or self.action_state == SplendorActionState.GAME_OVER:
+            self.done = True
+
+        return (any(vps) and all(all_turns)) or self.action_state == SplendorActionState.GAME_OVER
 
     def __repr__(self):
         return f"Players: {self.players} - Tier 1: {self.tier_1_cards} - Tier 2: {self.tier_2_cards} - Tier 3: {self.tier_3_cards} - Nobles: {self.nobles} - Gems: {self.gems}"
 
     def copy(self):
         new = SplendorGameState()
+        new.done = self.done
         new.action_state = self.action_state
         new.players = [player.copy() for player in self.players]
         new.tier_1_deck = self.tier_1_deck.copy()
@@ -549,6 +646,7 @@ class SplendorGameState():
             new.action_mask = None
         new.probability = self.probability
         new.action_list = self.action_list.copy()
+        new.players_turns = tuple(self.players_turns)
         return new
 
     # TO DO BETTER EVALS
@@ -559,15 +657,19 @@ class SplendorGameState():
 
         def se(pi):
             p = self.players[pi]
-            return p.get_victory_points()
+            return min(p.get_victory_points(),15)
 
         return se(player_index) - max([se(i) for i in range(4) if i != player_index])
 
-    def heuristic_eval(self,player_index):
+    def heuristic_eval(self,player_index,print_info=False):
         ## Attempt Better Evalutaion of State for Player
         # Best Engine
         
+        if self.is_game_over():
+            return self.static_eval(player_index)
+
         def he(pi):
+
 
             assert pi in range(0,4), f"Player Index {pi} is not in range 0-3"
 
@@ -577,71 +679,100 @@ class SplendorGameState():
             unseen_card_reward = 0
             UNSEEN_CARDS = self.tier_1_deck + self.tier_2_deck + self.tier_3_deck
             for card in UNSEEN_CARDS:
-                unseen_card_reward += p.perc_buy_no_gems(card.card_cost) * card.victory_points
+                unseen_card_reward += p.perc_buy_no_gems(card.card_cost) * card.victory_points * len(UNSEEN_CARDS)
 
-            unpurchased_card_reward = 0
+            unpurchased_card_reward = [0]
             UNPURCHASED_CARDS = self.tier_1_cards + self.tier_2_cards + self.tier_3_cards
+            #UNPURCHASED_CARDS = self.tier_3_cards
             for card in UNPURCHASED_CARDS:
-                if p.can_buy(card.card_cost) == True:
-                    unpurchased_card_reward += card.victory_points
-
+                unpurchased_card_reward.append(p.perc_buy_no_gems(card.card_cost) * card.victory_points)
+            unpurchased_card_reward = max(unpurchased_card_reward)
+                    
             # Evaluate the Engine of the Player for their own reserved cards * VP of the Cards
-            reserved_cards_reward = 0
+            reserved_cards_reward = [0]
             for card in self.players[player_index].reserved_cards:
-                reserved_cards_reward += p.perc_buy_no_gems(card.card_cost) * card.victory_points
+                reserved_cards_reward.append(p.perc_buy_no_gems(card.card_cost) * card.victory_points)
+            reserved_cards_reward = max(reserved_cards_reward)
 
             # Evaluate the Engine of the Player for the Nobles remaining * VP of the Nobles
-            noble_reward = 0
+            noble_reward = [0]
             for i in range(len(self.nobles)):
-                noble_reward += p.perc_visit_noble(self.nobles[i]) * self.nobles[i].noble_points
+                #print(self.nobles[i].noble_cost, p.get_card_purchase_amount(), p.perc_visit_noble(self.nobles[i])) if print_info == True else None
 
-            gem_reward = min(10,sum(p.gems)) / 5
+
+                noble_reward.append(p.perc_visit_noble(self.nobles[i]) * self.nobles[i].noble_points)
+            noble_reward = max(noble_reward)
+
+            #gem_reward = min(10,sum(p.gems)) / 5
 
             reward_list = [
-                gem_reward * 0.01,
-                p.get_victory_points(),
-                unseen_card_reward,
                 unpurchased_card_reward,
                 reserved_cards_reward,
                 noble_reward
             ]
-            #print(reward_list)
-            return sum(reward_list)
+            if print_info == True:
+                print(reward_list, min(sum(reward_list),15))
+            return min(sum(reward_list),15)
         
-        return he(player_index) - max([he(i) for i in range(4) if i != player_index])
 
 
-    def eval(self,start_player,depth=10,alpha=-math.inf, beta=math.inf,prune=True):
+        return he(player_index) - max([he(i) for i in range(4) if i != player_index]) 
 
-        #print(depth)
-        #depth <= 0 or
-        if self.is_game_over() or (self.current_player == start_player and self.action_state == SplendorActionState.TAKE_TURN) or depth <= 0:
+    def blend_eval(self,player_index):
+
+        if self.is_game_over():
+            return self.static_eval(player_index)
+
+        perc_split = (self.players_turns[player_index]-1 / max(self.players_turns[player_index]-1,25))
+        #print(1-perc_split, perc_split)
+
+        return (self.heuristic_eval(player_index)) * (1-perc_split) + (self.static_eval(player_index) * perc_split)
+
+    def eval(self,start_player,turns=None,depth=10,alpha=-math.inf, beta=math.inf,prune=True):
+
+        if turns == None:
+            turns = self.players_turns
+
+
+        # )
+        if self.done or self.is_game_over() or self.action_state == SplendorActionState.GAME_OVER:
 
             #heuristic_eval = self.heuristic_eval(start_player)
-            static_eval = self.heuristic_eval(start_player)
+            static_eval = self.blend_eval(start_player)
 
             #print(f"Depth: {depth} - Eval: {heuristic_eval} Static Eval: {static_eval}, Actions: {self.action_list}")
             
             # Static VP + Card Engine - Other Players VP - Other Players Card Engine
+            #print(f"GEval {static_eval} Depth: {depth} - Alpha: {alpha} - Beta: {beta} - Prune: {prune} - Action State: {self.action_state} - Start {start_player} Player: {self.current_player} - Turns: {turns[start_player]}<-{self.players_turns[start_player]} - Action List: {self.action_list}")
             return static_eval
         #print(depth)
+
+        if depth <= 0 or self.players_turns[start_player] >= turns[start_player] + 1:
+            heuristic_eval = self.blend_eval(start_player)
+            #print(f"DEval {heuristic_eval} Depth: {depth} - Alpha: {alpha} - Beta: {beta} - Prune: {prune} - Action State: {self.action_state} - Start {start_player} Player: {self.current_player} - Turns: {turns[start_player]}<-{self.players_turns[start_player]} - Action List: {self.action_list}")
+            return heuristic_eval
 
 
         if self.action_state == SplendorActionState.RANDOM_CARD:
             children = self.get_children()
 
-            children.sort(key=lambda x: x[0].heuristic_eval(start_player))
-            filter(lambda x: x[0].heuristic_eval(start_player) == children[0][0].heuristic_eval(start_player),children)
 
+            # Sort by worst heuristic eval
+            children.sort(key=lambda x: x[0].blend_eval(start_player))
+            filter(lambda x: x[0].blend_eval(start_player) == children[0][0].blend_eval(start_player),children)
+            # And randomly select from them to
 
-            return random.choice(children)[0].eval(start_player,depth-1,alpha,beta,prune=prune)
+            random_eval = random.choice(children)[0].eval(start_player,turns=turns,depth=depth-1,alpha=alpha,beta=beta,prune=prune)
+            #print(f"REval {random_eval} Depth: {depth} - Alpha: {alpha} - Beta: {beta} - Prune: {prune} - Action State: {self.action_state} - Start {start_player} Player: {self.current_player} - Turns: {turns[start_player]}<-{self.players_turns[start_player]} - Action List: {self.action_list}")
+
+            return random_eval
             
             total_eval = 0
 
 
 
             for ci, (child, action_int, splendor_action) in enumerate(children):
-                total_eval += child.eval(start_player,depth-1,alpha,beta) * child.probability
+                total_eval += child.eval(start_player,turns=turns,depth=depth-1,alpha=alpha,beta=beta,prune=prune) * child.probability
                 
                 guess_eval = total_eval / (ci+1/len(children))
                 beta = min(beta,guess_eval)
@@ -653,6 +784,21 @@ class SplendorGameState():
                     print(f"Didnt RPrune @ {depth} => {child.action_list[-10+depth:-1]}")         
             return total_eval
 
+
+        if self.action_state == SplendorActionState.DISCARD_GEM:
+            children = self.get_children()
+
+            # Sort by worst heuristic eval of discarding gems
+            children.sort(key=lambda x: x[0].blend_eval(start_player))
+            filter(lambda x: x[0].blend_eval(start_player) == children[0][0].blend_eval(start_player),children)
+            # And randomly select from them to further search
+
+            random_eval = random.choice(children)[0].eval(start_player,turns=turns,depth=depth-1,alpha=alpha,beta=beta,prune=prune)
+            #print(f"DiEval {random_eval} Depth: {depth} - Alpha: {alpha} - Beta: {beta} - Prune: {prune} - Action State: {self.action_state} - Start {start_player} Player: {self.current_player} - Turns: {turns[start_player]}<-{self.players_turns[start_player]} - Action List: {self.action_list}")
+
+            return random_eval
+            
+
         # Maximize the Current Player
 
         if start_player == self.current_player:
@@ -662,12 +808,16 @@ class SplendorGameState():
             children = self.get_children()
 
             for child, action_int, splendor_action in children:
-                eval = child.eval(start_player,depth-1,alpha,beta)
+                eval = child.eval(start_player,turns=turns,depth=depth-1,alpha=alpha,beta=beta,prune=prune)
                 max_eval = max(max_eval,eval)
                 alpha = max(alpha,eval)
                 if beta <= alpha and prune==True:
                     #print(f"Pruned Alpha Leaf @ depth {depth} {splendor_action} {self.action_list[-1]}")
                     break
+
+
+            #print(f"CEval {max_eval} Depth: {depth} - Alpha: {alpha} - Beta: {beta} - Prune: {prune} - Action State: {self.action_state} - Start {start_player} Player: {self.current_player} - Turns: {turns[start_player]}<-{self.players_turns[start_player]} - Action List: {self.action_list[-20+depth:-1]}")
+
 
             return max_eval
         
@@ -675,20 +825,39 @@ class SplendorGameState():
 
         else:
 
+            children = self.get_children()
 
-            min_eval = math.inf
-            for child, action_int, splendor_action in self.get_children()[::-1]:
-                eval = child.eval(start_player,depth-1,alpha,beta)
-                min_eval = min(min_eval,eval)
-                beta = min(beta,eval)
-                if beta <= alpha and prune==True:
 
-                    print(f"Pruned Beta @ {depth} => {child.action_list[-10+depth:-1]}")
-                    break
-                else:
-                    print(f"Didnt Prune @ {depth} => {child.action_list[-10+depth:-1]}")
+            # Sort by worst heuristic eval
+            children.sort(key=lambda x: x[0].blend_eval(start_player)) #Worst to Best
+            filter(lambda x: x[0].blend_eval(start_player) == children[0][0].blend_eval(start_player),children)
+            # And randomly select from them to
             
-            return min_eval
+            
+            
+            
+            random_eval = random.choice(children)[0].eval(start_player,turns=turns,depth=depth-1,alpha=alpha,beta=beta,prune=prune)
+            #print(f"OEval {random_eval} Depth: {depth} - Alpha: {alpha} - Beta: {beta} - Prune: {prune} - Action State: {self.action_state} - Start {start_player} Player: {self.current_player} - Turns: {turns[start_player]}<-{self.players_turns[start_player]} - Action List: {self.action_list}")
+
+
+            return random_eval            
+                        
+
+
+
+            # min_eval = math.inf
+            # for child, action_int, splendor_action in self.get_children()[::-1]:
+            #     eval = child.eval(start_player,depth-1,alpha,beta)
+            #     min_eval = min(min_eval,eval)
+            #     beta = min(beta,eval)
+            #     if beta <= alpha and prune==True:
+
+            #         print(f"Pruned Beta @ {depth} => {child.action_list[-10+depth:-1]}")
+            #         break
+            #     else:
+            #         print(f"Didnt Prune @ {depth} => {child.action_list[-10+depth:-1]}")
+            
+            # return min_eval
         
     def get_children(self):
 
@@ -705,7 +874,7 @@ class SplendorGameState():
                 new_state.current_player = (self.current_player + 1) % 4
                 new_state.action_mask = new_state.get_valid_actions()
                 new_state.action_list = self.action_list.copy()
-                new_state.action_list.append(("RANDOM_CARD",i))
+                new_state.action_list.append((self.current_player,("RANDOM_CARD",i)))
 
                 new_state.check()
                 children.append((new_state, i, ("RANDOM_CARD",i)))
@@ -718,10 +887,10 @@ class SplendorGameState():
                     new_state.take_action(i,skip_random=False)
                     new_state.probability = 1
                     new_state.action_list = self.action_list.copy()
-                    new_state.action_list.append(SPLENDOR_ACTIONS[i])
+                    new_state.action_list.append((self.current_player,SPLENDOR_ACTIONS[i]))
                     children.append((new_state, i, SPLENDOR_ACTIONS[i]))
             
-            children.sort(key=lambda x: x[0].heuristic_eval(self.current_player), reverse=True)
+            children.sort(key=lambda x: x[0].blend_eval(self.current_player), reverse=True)
             #print(f"new children {len(children)} {self.get_count_actions_dict()}")
             return children
 
@@ -731,27 +900,28 @@ class SplendorGameState():
 
     def get_best_action(self,depth=3,prune=True):
 
-        best_children = self.get_best_options(depth=depth,prune=prune)
+        best_children, eval = self.get_best_options(depth=depth,prune=prune)
         # sort them by the best heuristical eval
         best_children = sorted(best_children, key=lambda x: x[0].heuristic_eval(self.current_player), reverse=True)
-        print(best_children[0][0].heuristic_eval(self.current_player))
-        print(best_children[-1][0].heuristic_eval(self.current_player))
+        #print(best_children[0][0].heuristic_eval(self.current_player))
+        #print(best_children[-1][0].heuristic_eval(self.current_player))
         # keep only the best ones
         filter(lambda x: x[0].heuristic_eval(self.current_player) == best_children[0][0].heuristic_eval(self.current_player),best_children)
-        return random.choice(best_children)[1]
+        child = random.choice(best_children)
+        return child, child[0].static_eval(self.current_player), child[0].heuristic_eval(self.current_player), eval  
 
     def get_best_options(self,depth=3,prune=True):
 
         # Return the Index of the Best Action
 
         if self.action_state == SplendorActionState.RANDOM_CARD:
-            return self.get_random_card_index()
+            return (None,self.get_random_card_index()), None
         
         if self.action_state == SplendorActionState.GAME_OVER:
-            return None
+            return (None, None), None
         
         children = self.get_children()
-        print(f"Player {self.current_player} - Children: {len(children)}")
+        #print(f"Player {self.current_player} - Children: {len(children)}")
 
         max_eval = -math.inf
         alpha = -math.inf
@@ -760,7 +930,7 @@ class SplendorGameState():
         best_children = []
 
         for child, action_int, splendor_action in children:
-            eval = child.eval(self.current_player,depth=depth, alpha=alpha, beta=beta,prune=prune)
+            eval = child.eval(self.current_player,turns=self.players_turns,depth=depth-1,alpha=alpha,beta=beta,prune=prune)
             if eval > max_eval:
                 max_eval = eval
                 best_children = []
@@ -771,10 +941,10 @@ class SplendorGameState():
             max_eval = max(max_eval,eval)
             alpha = max(alpha,eval)
             if beta <= alpha:
-                print("Pruned Top Level Alpha?")
+                #print("Pruned Top Level Alpha?")
                 break
         
-        return best_children
+        return best_children, max_eval
 
     def get_best_random_type(self):
         if self.action_state == SplendorActionState.RANDOM_CARD:
@@ -873,7 +1043,11 @@ class SplendorGameState():
 
 
         self.action_state = SplendorActionState.TAKE_TURN
+        self.players_turns = [self.players_turns[0],self.players_turns[1],self.players_turns[2],self.players_turns[3]]
+        self.players_turns[self.current_player] += 1
+        self.players_turns = tuple(self.players_turns)
         self.current_player = (self.current_player + 1) % 4
+
         self.action_mask = self.get_valid_actions()
         self.check()
 
@@ -976,6 +1150,9 @@ class SplendorGameState():
         # Players should not have negative gems
         assert all([all([j >= 0 for j in i.gems]) for i in self.players]), f"Players have negative gems {[i.gems for i in self.players]}"
 
+        if self.is_game_over():
+            self.action_state = SplendorActionState.GAME_OVER
+
     def get_count_actions_dict(self):
 
         action_mask = self.get_valid_actions()
@@ -1018,27 +1195,14 @@ class SplendorGameState():
 
         if action_mask.count(1) == 0:
             action_mask = []
-
             
             for i in range(0, len(SPLENDOR_ACTIONS)):
                 action_type, action_value = SPLENDOR_ACTIONS[i]
                 if action_type == SplendorActionType.TAKE_3_GEMS:
-                    action_mask.append(self.take_3_gems_valid(action_value, print_info=True) * 1)
-                elif action_type == SplendorActionType.TAKE_2_GEMS:
-                    action_mask.append(self.take_2_gems_valid(action_value, print_info=True) * 1)
-                elif action_type == SplendorActionType.RESERVE_CARD:
-                    action_mask.append(self.reserve_card_valid(action_value, print_info=True) * 1)
-                elif action_type == SplendorActionType.BUY_CARD:
-                    action_mask.append(self.buy_card_valid(action_value, print_info=True) * 1)
-                elif action_type == SplendorActionType.BUY_RESERVED_CARD:
-                    action_mask.append(self.buy_reserved_card_valid(action_value, print_info=True) * 1)
-                elif action_type == SplendorActionType.VISIT_NOBLE_CHOICE:
-                    action_mask.append(self.visit_noble_valid(action_value, print_info=True) * 1)
-                elif action_type == SplendorActionType.DISCARD_GEM:
-                    action_mask.append(self.discard_gems_valid(action_value, print_info=True) * 1)           
-            #print(len(SPLENDOR_ACTIONS) - action_mask.count(1))
-            raise Exception()
-        #print(action_string)
+                    action_mask.append(1)
+                else:
+                    action_mask.append(0)        
+
         return action_mask
  
     def get_tier_1_deck(self):
@@ -1058,10 +1222,13 @@ class SplendorGameState():
         random.shuffle(self.nobles_deck)
 
     def reset(self,seed=None):
+
+
         self.seed = seed
         random.seed(seed)
         self.action_state = SplendorActionState.TAKE_TURN
         self.players = [Player(), Player(), Player(), Player()]
+        self.done = False
         self.get_tier_1_deck()
         self.get_tier_2_deck()
         self.get_tier_3_deck()
@@ -1170,13 +1337,13 @@ class SplendorGameState():
                     count_g += 1
     
 
-            #print("VALIDATING TAKE 3 GEMS: ", gems, self.gems, self.players[self.current_player].gems, self.action_state, count_g > 0 or sum(self.gems[0:5]) == 0)
+            #print("VALIDATING TAKE 3 GEMS: ", gems, self.gems, self.players[self.current_player].gems, self.action_state, count_g > 1 or sum(self.gems[0:5]) == 0)
 
         if self.action_state != SplendorActionState.TAKE_TURN:
             return False
 
         # take_3_gems is valid if you are taking at least 1 gem or there are no gems available
-        return (count_g > 1 and sum(self.players[self.current_player].gems) != 10) or sum(self.gems[0:5]) == 0
+        return (count_g > 1 or sum(self.gems[0:5]) == 0)
 
     def take_3_gems(self, gems):
         
@@ -1484,118 +1651,198 @@ class SplendorGameState():
     # Observations for Environment
 
     def get_action_state_obs(self):
-        return self.action_state.value
+        return int(self.action_state.value)
 
     def get_action_mask_obs(self):
-        return np.array(self.action_mask)
+        return np.array(self.action_mask, dtype=np.uint8)
     
     def get_player_gems_obs(self):
-        return np.array([p.gems for p in self.players])
+        return np.array([self.players[i % 4].gems for p in range(self.current_player, self.current_player+4)], dtype=np.uint8)
 
     def get_card_options_obs(self):
         card_options_obs = {}
-        card_options_obs["card_cost"] = np.array([card.card_cost for card in self.tier_1_cards]).concatenate([card.card_cost for card in self.tier_2_cards]).concatenate([card.card_cost for card in self.tier_3_cards])
-        card_options_obs["card_points"] = np.array([card.card_points for card in self.tier_1_cards]).concatenate([card.card_points for card in self.tier_2_cards]).concatenate([card.card_points for card in self.tier_3_cards])
-        card_options_obs["card_tier"] = np.array([card.tier for card in self.tier_1_cards]).concatenate([card.tier for card in self.tier_2_cards]).concatenate([card.tier for card in self.tier_3_cards])
-        card_options_obs["card_type"] = np.array([card.gem_color for card in self.tier_1_cards]).concatenate([card.gem_color for card in self.tier_2_cards]).concatenate([card.gem_color for card in self.tier_3_cards])
+
+        card_cost = []
+        card_points = []
+        card_tier = []
+        card_type = []
+
+        for tier in [self.tier_1_cards,self.tier_2_cards,self.tier_3_cards]:
+
+            cc = []
+            cp = []
+            cti = []
+            cty = []
+
+            for card in tier:
+                cc.append(card.card_cost)
+                cp.append(card.victory_points)
+                cti.append(card.tier)
+                cty.append(card.gem_color)
+
+            for i in range(4-len(tier)):
+                cc.append([0,0,0,0,0])
+                cp.append(0)
+                cti.append(0)
+                cty.append(0)                
+
+            card_cost.append(cc.copy())
+            card_points.append(cp.copy())
+            card_tier.append(cti.copy())
+            card_type.append(cty.copy())
+
+        card_options_obs["card_cost"] = np.array(card_cost, dtype=np.uint8)
+        card_options_obs["card_points"] = np.array(card_points, dtype=np.uint8)
+        card_options_obs["card_tier"] = np.array(card_tier, dtype=np.uint8)
+        card_options_obs["card_type"] = np.array(card_type, dtype=np.uint8)
         return card_options_obs
 
     def get_noble_options_obs(self):
         nobles_options_obs = {}
-        nobles_options_obs["noble_cost"] = np.array([noble.noble_cost for noble in self.nobles])
-        nobles_options_obs["noble_points"] = np.array([noble.noble_points for noble in self.nobles])
+
+        noble_cost = [noble.noble_cost for noble in self.nobles]
+        noble_points = [noble.noble_points for noble in self.nobles]
+
+        for i in range(5-len(self.nobles)):
+            noble_cost.append([0,0,0,0,0])
+            noble_points.append(0)
+
+
+        nobles_options_obs["noble_cost"] = np.array(noble_cost, dtype=np.uint8)
+        nobles_options_obs["noble_points"] = np.array(noble_points, dtype=np.uint8)
         return nobles_options_obs
 
+    def get_player_engine_obs(self):
 
-    def get_card_types_obs(self):
-        pass
+        # sort in order of upcoming players
 
-    def get_card_purchasable_obs(self):
-        pass
+        player_engine_obs = np.array([self.players[pi % 4].get_card_purchase_amount() for pi in range(self.current_player, self.current_player+4)], dtype=np.uint8)
+        return player_engine_obs
 
-    def get_player_purchasing_power_obs(self):
-        pass
+    def get_player_cards_obs(self):
 
-    def get_player_cards_obs(self, player_num=0):
-        pass
+        # sort in order of upcoming players
 
-    def get_player_reserved_cards(self):
-        pass
+        player_cards_obs = {}
 
-    def get_nobsles_obs(self):
-        pass
+        card_cost = []
+        card_points = []
+        card_tier = []
+        card_type = []
+
+        for p_i in range(self.current_player, self.current_player+4):
+
+            p = self.players[p_i % 4]
+
+            cc = []
+            cp = []
+            cti = []
+            cty = []
+
+            for card in p.cards:
+                cc.append(card.card_cost)
+                cp.append(card.victory_points)
+                cti.append(card.tier)
+                cty.append(card.gem_color)
+
+            for i in range(27-len(p.cards)) :
+                cc.append([0,0,0,0,0])
+                cp.append(0)
+                cti.append(0)
+                cty.append(0)
+
+            card_cost.append(cc.copy())
+            card_points.append(cp.copy())
+            card_tier.append(cti.copy())
+            card_type.append(cty.copy())
+
+        player_cards_obs["card_cost"] = np.array(card_cost, dtype=np.uint8)
+        player_cards_obs["card_points"] = np.array(card_points, dtype=np.uint8)
+        player_cards_obs["card_tier"] = np.array(card_tier, dtype=np.uint8)
+        player_cards_obs["card_type"] = np.array(card_type, dtype=np.uint8)
+
+        return player_cards_obs
 
     def get_player_points_obs(self):
-        pass
+        return np.array([min(self.players[p % 4].get_victory_points(),15) for p in range(self.current_player, self.current_player+4)], dtype=np.uint8)
+
+    def get_reserved_cards_obs(self):
+
+        # sort in order of upcoming players
+
+        player_cards_obs = {}
+
+        card_cost = []
+        card_points = []
+        card_tier = []
+        card_type = []
+
+        for p_i in range(self.current_player, self.current_player+4):
+
+            p = self.players[p_i % 4]
+
+            cc = []
+            cp = []
+            cti = []
+            cty = []
+
+            for card in p.reserved_cards:
+                cc.append(card.card_cost)
+                cp.append(card.victory_points)
+                cti.append(card.tier)
+                cty.append(card.gem_color)
+
+            for i in range(3-len(p.reserved_cards)) :
+                cc.append([0,0,0,0,0])
+                cp.append(0)
+                cti.append(0)
+                cty.append(0)
+
+            card_cost.append(cc.copy())
+            card_points.append(cp.copy())
+            card_tier.append(cti.copy())
+            card_type.append(cty.copy())
+
+
+        player_cards_obs["card_cost"] = np.array(card_cost, dtype=np.uint8)
+        player_cards_obs["card_points"] = np.array(card_points, dtype=np.uint8)
+        player_cards_obs["card_tier"] = np.array(card_tier, dtype=np.uint8)
+        player_cards_obs["card_type"] = np.array(card_type, dtype=np.uint8)
+
+        return player_cards_obs
 
     def get_cards_details_obs(self):
-        pass
+
+        # sort in order of upcoming players
+
+        cards_details_obs = {}
+
+        card_cost = []
+        card_points = []
+        card_tier = []
+        card_type = []
+
+
+
+        for card in TIER_1_DECK + TIER_2_DECK + TIER_3_DECK:
+            card_cost.append(card.card_cost)
+            card_points.append(card.victory_points)
+            card_tier.append(card.tier)
+            card_type.append(card.gem_color)
+
+
+        cards_details_obs["card_cost"] = np.array(card_cost,dtype=np.uint8)
+        cards_details_obs["card_points"] = np.array(card_points,dtype=np.uint8)
+        cards_details_obs["card_tier"] = np.array(card_tier, dtype=np.uint8)
+        cards_details_obs["card_type"] = np.array(card_type, dtype=np.uint8)
+
+        return cards_details_obs
 
 
 
 
-if __name__ == "__main__":
 
-
-    current_time = time.time()
-
-    SplendorEnv()
-
-    sgs = SplendorGameState()
-    sgs.reset()
-    turn_count = 0
-    times_eval = 0
-    total_time_eval = 0
-
-    while sgs.is_game_over() == False:
-
-        if sgs.current_player == 0:
-
-            eval_start = time.time()
-            action_index = sgs.get_best_action(depth=10)
-            eval_end = time.time()
-
-            print("Eval Time: ", eval_end-eval_start)
-            
-            sgs.take_action(action_index,skip_random=True)
-            turn_count += 1
-
-
-            print(SPLENDOR_ACTIONS[action_index])
-            print([p.get_victory_points() for p in sgs.players])
-            print([sgs.static_eval(p) for p in range(4)])
-            print([sgs.heuristic_eval(p) for p in range(4)])
-            
-            time.sleep(5)
-
-        elif sgs.current_player == 10:
-            action_index = sgs.get_random_best_action(depth=2)
-            sgs.take_action(action_index,skip_random=True)
-            turn_count += 1
-
-        elif sgs.current_player == 1:
-            action_index = sgs.get_best_random_type()
-            sgs.take_action(action_index,skip_random=True)
-            turn_count += 1
-
-        else:
-            action_index = random.choice([i for i, v in enumerate(sgs.action_mask) if v == 1])
-            sgs.take_action(action_index,skip_random=True)
-            turn_count += 1
-
-
-
-
-    print("\n")
-    
-    print([p.get_victory_points() for p in sgs.players])
-    print([sgs.static_eval(p) for p in range(4)])
-    print([sgs.heuristic_eval(p) for p in range(4)]) 
-
-    print([p.get_card_purchase_amount() for p in sgs.players])
-    print([len(p.nobles) for p in sgs.players])
-    end_time = time.time()
-    print(f"Game Over in {turn_count} turns and {end_time-current_time} seconds. TPS: {turn_count/(end_time-current_time)}")
+          
 
 
 

@@ -61,7 +61,11 @@ The action state helps keep track of the potential upcoming actions
 4) GAME_OVER
 5) RANDOM_CARD
 
-### Evaluating a Game State
+### Evaluating a Game State (For Reward Function and Traditional Tree Search for opponents)
+
+For Base Training of the Model, i try to give it a fairly challenging opponent that can use tree search 
+to find the best move. They look ahead as many moves (scaling up as the model achieves better results) as they can.
+To perform the Tree Search and provide a reward for the AI we need some way to evaluate whether a state is "good" or "bad"
 
 #### Static Evaluation
 
@@ -70,8 +74,7 @@ A Static Evaluation of whether a Game State is "good" has be simplified to:
 
 The ultimate goal being to achieve 15 points before anyone else staying ahead of the pack is one way to win the game.
 
-#### Heuristic Evaluation
-
+#### Heuristic Evaluati
 A Heuristic Evaluation of whether a Game State is "good" can be further expanded to include the following features:
 - The number of victory points
 - The number of gems a player has (with a maximum limit of 10)
@@ -82,7 +85,6 @@ A Heuristic Evaluation of whether a Game State is "good" can be further expanded
 Generally aiming to calculate the strength of the player's resource engine based on the current state.
 A better engine generally means that victory points are easier to collect than the opponent and the player will win the game.
 
-
 #### Expectiminimax Search
 
 A Tree search can be completed from the current Game State to evaluate moves ahead.
@@ -91,6 +93,12 @@ This means that significant pruning is need and further optimisations are requir
 
 Futher complications involve the degree of randomness that can occur. When a Card is Reserved or Bought from the available pool it is replaced by a card remaining in the deck.
 This means that the branching factor can skyrocket to +30-40.
+
+##### Optimisations
+
+Evaluation of Opponent, Random Cards and Discarding Gems have been reduced to:
+Random Choice of the Worst Heuristical Eval for Current Player.
+The hope being that the player makes the best action given the "guestimated" worst action for them from the opponents. 
 
 # TODOS
 
