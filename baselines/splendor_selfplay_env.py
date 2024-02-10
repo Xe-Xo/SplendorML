@@ -4,15 +4,13 @@ from pathlib import Path
 import os
 from shutil import copyfile # keep track of generations
 
-
 from stable_baselines3 import PPO
 from stable_baselines3.common.callbacks import EvalCallback
 
 import random
 
-
 LOGDIR = "experiments/self_play"
-BEST_THRESHOLD = 0.5
+BEST_THRESHOLD = 0
 
 class SelfPlayCallback(EvalCallback):
 
@@ -33,6 +31,7 @@ class SelfPlayCallback(EvalCallback):
             backup_file = os.path.join(LOGDIR, "history_"+str(self.generation).zfill(8)+".zip")
             copyfile(source_file, backup_file)
             self.best_mean_reward = BEST_THRESHOLD
+
 
         return result
 

@@ -5,6 +5,7 @@ import random
 from itertools import combinations, permutations, combinations_with_replacement
 import time
 import math
+from typing import List, Optional
 
 
 
@@ -147,8 +148,13 @@ class SplendorEnv(Env):
         self.seed = None
         self.last_obs = None
         self.games_played = []
+        self.total_games = 0
 
         self.reset(None)
+
+    def action_masks(self) -> List[bool]:
+        return self.game_state.action_mask
+        
 
     def get_obs(self):
 
@@ -235,23 +241,28 @@ class SplendorEnv(Env):
 
     def reset(self,seed=None, options=None):
         #print("env reset")
+
+        
         
         if self.game_state.done == True and self.player_num is not None:
-            
-
+            self.total_games += 1
+            won = False
             winners = self.game_state.get_winner()
             if self.player_num in winners:
                 if len(winners) == 1:
                     self.games_played.append(1)
+                    won = True
                 else:
                     self.games_played.append(1/len(winners))
             else:
                 self.games_played.append(0)
 
-            if len(self.games_played) >= 250:
+            if len(self.games_played) > 250:
                 self.games_played.pop(0)
+
+            if self.total_games % 50 == 0:
             
-                print(f"WIN RATE: {sum(self.games_played)/250}")
+                print(f"WIN RATE: {round(sum(self.games_played)/len(self.games_played)*100)}%")
 
 
 
