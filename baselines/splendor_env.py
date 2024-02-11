@@ -123,22 +123,22 @@ class SplendorEnv(Env):
 
             "player_engine": spaces.Box(low=0, high=25, shape=(4,5), dtype=np.uint8),
 
-            "player_card_cost": spaces.Box(low=0, high=10, shape=(4,27,5), dtype=np.uint8), 
-            "player_card_type": spaces.Box(low=0, high=5, shape=(4, 27), dtype=np.uint8),
-            "player_card_points": spaces.Box(low=0, high=7, shape=(4, 27), dtype=np.uint8),
-            "player_card_tier": spaces.Box(low=0, high=3, shape=(4, 27), dtype=np.uint8),
+            #"player_card_cost": spaces.Box(low=0, high=10, shape=(4,27,5), dtype=np.uint8), 
+            #"player_card_type": spaces.Box(low=0, high=5, shape=(4, 27), dtype=np.uint8),
+            #"player_card_points": spaces.Box(low=0, high=7, shape=(4, 27), dtype=np.uint8),
+            #"player_card_tier": spaces.Box(low=0, high=3, shape=(4, 27), dtype=np.uint8),
 
             "reserved_card_cost": spaces.Box(low=0, high=10, shape=(4,3,5), dtype=np.uint8), 
             "reserved_card_type": spaces.Box(low=0, high=5, shape=(4, 3), dtype=np.uint8),
             "reserved_card_points": spaces.Box(low=0, high=7, shape=(4, 3), dtype=np.uint8),
-            "reserved_card_tier": spaces.Box(low=0, high=3, shape=(4, 3), dtype=np.uint8),
+            #"reserved_card_tier": spaces.Box(low=0, high=3, shape=(4, 3), dtype=np.uint8),
       
             "player_points": spaces.Box(low=0, high=15, shape=(4,), dtype=np.uint8),
 
-            "all_card_cost": spaces.Box(low=0, high=10, shape=(90,5), dtype=np.uint8),
-            "all_card_type": spaces.Box(low=0, high=5, shape=(90,), dtype=np.uint8),
-            "all_card_points": spaces.Box(low=0, high=7, shape=(90,), dtype=np.uint8),
-            "all_card_tier": spaces.Box(low=0, high=3, shape=(90,), dtype=np.uint8),
+            #"all_card_cost": spaces.Box(low=0, high=10, shape=(90,5), dtype=np.uint8),
+            #"all_card_type": spaces.Box(low=0, high=5, shape=(90,), dtype=np.uint8),
+            #"all_card_points": spaces.Box(low=0, high=7, shape=(90,), dtype=np.uint8),
+            #"all_card_tier": spaces.Box(low=0, high=3, shape=(90,), dtype=np.uint8),
             #"all_card_purchased": spaces.Box(low=0, high=5, shape=(90,)), # 0 - Available Purchase, 1 - Purchased by Current Player, 2 - Reserved by Current Player, 3 - Other Players Purchased, 4 - Other Players Reserved, 5 - Not Seen
 
 
@@ -164,10 +164,10 @@ class SplendorEnv(Env):
         card_options_obs = self.game_state.get_card_options_obs()
         noble_options_obs = self.game_state.get_noble_options_obs()
         player_engine_obs = self.game_state.get_player_engine_obs()
-        player_cards_obs = self.game_state.get_player_cards_obs()
+        #player_cards_obs = self.game_state.get_player_cards_obs()
         reserved_cards_obs = self.game_state.get_reserved_cards_obs()
         player_points_obs = self.game_state.get_player_points_obs()
-        card_details_obs = self.game_state.get_cards_details_obs()
+        #card_details_obs = self.game_state.get_cards_details_obs()
 
         return {
             "action_state": action_state_obs,
@@ -184,22 +184,22 @@ class SplendorEnv(Env):
 
             "player_engine": player_engine_obs,
 
-            "player_card_cost": player_cards_obs["card_cost"], 
-            "player_card_type": player_cards_obs["card_type"], 
-            "player_card_points": player_cards_obs["card_points"], 
-            "player_card_tier": player_cards_obs["card_tier"], 
+            #"player_card_cost": player_cards_obs["card_cost"], 
+            #"player_card_type": player_cards_obs["card_type"], 
+            #"player_card_points": player_cards_obs["card_points"], 
+            #"player_card_tier": player_cards_obs["card_tier"], 
 
             "reserved_card_cost": reserved_cards_obs["card_cost"], 
             "reserved_card_type": reserved_cards_obs["card_type"], 
             "reserved_card_points": reserved_cards_obs["card_points"], 
-            "reserved_card_tier": reserved_cards_obs["card_tier"], 
+            #"reserved_card_tier": reserved_cards_obs["card_tier"], 
       
             "player_points": player_points_obs,
 
-            "all_card_cost": card_details_obs["card_cost"], 
-            "all_card_type": card_details_obs["card_type"], 
-            "all_card_points": card_details_obs["card_points"], 
-            "all_card_tier": card_details_obs["card_tier"], 
+            #"all_card_cost": card_details_obs["card_cost"], 
+            #"all_card_type": card_details_obs["card_type"], 
+            #"all_card_points": card_details_obs["card_points"], 
+            #"all_card_tier": card_details_obs["card_tier"], 
         }
 
     def step(self, action):

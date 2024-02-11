@@ -5,6 +5,7 @@ import os
 from shutil import copyfile # keep track of generations
 
 from stable_baselines3 import PPO
+from sb3_contrib.ppo_mask import MaskablePPO
 from stable_baselines3.common.callbacks import EvalCallback
 
 import random
@@ -71,6 +72,6 @@ class SplendorSelfPlayEnv(SplendorEnv):
                 self.best_model_filename = filename
                 if self.best_model is not None:
                     del self.best_model
-                self.best_model = PPO.load(filename, env=self)
+                self.best_model = MaskablePPO.load(filename, env=self)
 
         return super(SplendorSelfPlayEnv, self).reset(seed=seed, options=options)

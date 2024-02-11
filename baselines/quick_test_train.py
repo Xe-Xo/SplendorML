@@ -4,7 +4,9 @@ import uuid
 
 import gymnasium as gym
 import numpy as np
+import torch as th
 
+from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.env_checker import check_env
 from stable_baselines3 import PPO
 from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv
@@ -29,6 +31,8 @@ def make_env(rank=0, config={}, seed=0):
 
     def __init():
         env = SplendorSelfPlayEnv()
+
+        env = Monitor(env)
         env.reset(seed=(seed + rank))
         return env
     
@@ -40,7 +44,7 @@ if __name__ == '__main__':
     sess_path = Path(f'experiments/session_{sess_id}')
 
     ep_length = 2048 * 10 * 4
-    cpu_multiplier = 1.0
+    cpu_multiplier = 0.5
     env_config = {}
     n_steps = int(5120 // cpu_multiplier)
     num_cpu = int(32 * cpu_multiplier)
@@ -49,9 +53,9 @@ if __name__ == '__main__':
     checkpoint_callback = CheckpointCallback(save_freq=ep_length, save_path=sess_path,
                                      name_prefix='splendor')
     
-    eval_callback = SelfPlayCallback(eval_env=env,best_model_save_path="experiments/self_play",log_path="experiments/self_play", eval_freq=ep_length, verbose=1)
+    eval_callback = SelfPlayCallback(eval_env=env,best_model_save_path="experiments/self_play",log_path="experiments/self_play", eval_freq=n_steps, verbose=1)
 
-    callbacks = [checkpoint_callback,eval_callback]
+    callbacks = [checkpoint_callback]#eval_callback]
 
     learn_steps = 40
     
