@@ -6,35 +6,119 @@ from shutil import copyfile # keep track of generations
 
 from stable_baselines3 import PPO
 from sb3_contrib.ppo_mask import MaskablePPO
-from stable_baselines3.common.callbacks import EvalCallback
+from stable_baselines3.common.callbacks import BaseCallback
 
 import random
+import numpy as np
 
 LOGDIR = "experiments/self_play"
-BEST_THRESHOLD = 0
+BEST_THRESHOLD = 0.40 # 15% games over average win rate 25%
 
-class SelfPlayCallback(EvalCallback):
+def merge_dicts_by_mean(dicts):
+
+    std_dict = {}
+    min_dict = {}
+    max_dict = {}
+    mean_dict = {}
+
+    for k in dicts:
+        max_dict[k] = np.max(dicts[k])
+        min_dict[k] = np.min(dicts[k])
+        std_dict[k] = np.std(dicts[k])
+        mean_dict[k] = np.mean(dicts[k])
+
+    return mean_dict, std_dict, min_dict, max_dict #{k: len(dicts[k]) for k in dicts.keys()}
+
+
+class SelfPlayCallback(BaseCallback):
 
     def __init__(self, *args, **kwargs):
         super(SelfPlayCallback, self).__init__(*args, **kwargs)
-        self.best_mean_reward = -1
         self.generation = 0
+        self.i_dict = {} # individual end_game_state_data
+        self.threshold_count = 0
+        
+
+    def add_dicts(self, done_dicts):
+        for d in done_dicts:
+            if d["average_turns"] == 0:
+                continue
+
+            for k, v in d.items():
+                
+                if k not in self.i_dict.keys():
+                    self.i_dict[k] = [v]
+                else:
+                    self.i_dict[k].append(v)
+
+                if len(self.i_dict[k]) > 100:
+                    self.i_dict[k].pop(0)
+
+    def _on_rollout_start(self) -> None:
+        
+
+        super(SelfPlayCallback, self)._on_rollout_start()
+
+        mean_dict, std_dict, min_dict, max_dict = merge_dicts_by_mean(self.i_dict)
+
+        for k in mean_dict.keys():
+
+            self.logger.record(f"game_stats_{k}/mean", mean_dict[k])
+
+            if "action_type" in k:
+                continue
+            
+            self.logger.record(f"game_stats_{k}/std", std_dict[k])
+            self.logger.record(f"game_stats_{k}/min", min_dict[k])
+            self.logger.record(f"game_stats_{k}/max", max_dict[k])
+            #self.logger.record(f"game_stats_{k}/count", count_dict[k])
+        
+        self.i_dict = {}
+
+        self.logger.record(f"selfplay/generation", self.generation)
+
+        if "win_rate" in mean_dict.keys():
+
+            last_win_rate = mean_dict["last_score"]
+            print(f"Average Win rate {last_win_rate}")
+            
+            if last_win_rate >= BEST_THRESHOLD:
+                self.threshold_count += 1
+            else:
+                self.threshold_count = 0
+
+            if self.threshold_count > 2 or last_win_rate > 0.50: #  
+
+
+                print(f"SELFPLAY: win_rate achieved: {last_win_rate}>={BEST_THRESHOLD}")
+                self.generation += 1
+
+                print("SELFPLAY: new best model, bumping up generation to", self.generation)
+                self.model.save(os.path.join(LOGDIR, "best_model.zip"))
+                self.model.save(os.path.join(LOGDIR, f"history_{self.generation}.zip"))
+                self.training_env.unwrapped.env_method("reset_agents")
 
     def _on_step(self) -> bool:
+        
+        done_vector = [over for over in self.training_env.unwrapped.get_attr("env_reset")]
+        if not any(done_vector):
+            return True
+        
+        
+        dict_vector = self.training_env.unwrapped.env_method("get_game_stats")
+        
+        dict_vector_done = [d for d, done in zip(dict_vector, done_vector) if done]
 
-        result = super(SelfPlayCallback, self)._on_step()
-        if result and self.best_mean_reward > BEST_THRESHOLD:
-            self.generation += 1
-            print("SELFPLAY: mean_reward achieved:", self.best_mean_reward)
-            print("SELFPLAY: new best model, bumping up generation to", self.generation)
+        for i in dict_vector_done:
+            for j in i.keys():
+                print(f"{j}: {i[j]}")
+            print("-----")
 
-            source_file = os.path.join(LOGDIR, "best_model.zip")
-            backup_file = os.path.join(LOGDIR, "history_"+str(self.generation).zfill(8)+".zip")
-            copyfile(source_file, backup_file)
-            self.best_mean_reward = BEST_THRESHOLD
+        self.add_dicts(dict_vector_done)
+        
+        return True
 
 
-        return result
 
 class SplendorSelfPlayEnv(SplendorEnv):
 

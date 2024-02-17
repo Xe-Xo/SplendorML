@@ -1,5 +1,6 @@
 
 experiments/session_*
+old_experiments
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

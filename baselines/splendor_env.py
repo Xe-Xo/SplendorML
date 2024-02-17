@@ -7,6 +7,7 @@ import time
 import math
 from typing import List, Optional
 
+from agents.base_agent import Agent
 
 
 class SplendorActionState(Enum):
@@ -105,7 +106,12 @@ from sklearn import preprocessing
     
 class SplendorEnv(Env):
 
-    def __init__(self):
+    def __init__(self, agents=(Agent(), Agent(), Agent())):
+        
+        self.agents = agents
+
+
+
         self.action_space = spaces.Discrete(len(SPLENDOR_ACTIONS))
         self.observation_space = spaces.Dict({
             
@@ -148,13 +154,27 @@ class SplendorEnv(Env):
         self.seed = None
         self.last_obs = None
         self.games_played = []
+        self.turns_played = []
         self.total_games = 0
+        self.env_reset = False
+
+        for i in self.agents:
+            i.setup(self)
+        self.count_action_type = {}
 
         self.reset(None)
-
-    def action_masks(self) -> List[bool]:
-        return self.game_state.action_mask
         
+
+
+    #def action_masks(self) -> List[bool]:
+    #    
+    #    return [True if i == 1 else False for i in self.game_state.action_mask]
+
+    def reset_agents(self):
+        for i in self.agents:
+            i.setup(self)
+        self.games_played = []
+        self.count_action_type = {}
 
     def get_obs(self):
 
@@ -204,14 +224,21 @@ class SplendorEnv(Env):
 
     def step(self, action):
 
+        assert self.game_state.action_mask[action] == 1, "Invalid Action"
         assert self.game_state.done == False, "Game is Over"
         assert self.player_num == self.game_state.current_player, f"Player {self.player_num} is not the current player {self.game_state.current_player}"
+
+
+        if SPLENDOR_ACTIONS[action][0] not in self.count_action_type.keys():
+            self.count_action_type[SPLENDOR_ACTIONS[action][0]] = 1
+        else:
+            self.count_action_type[SPLENDOR_ACTIONS[action][0]] += 1
 
 
         if self.last_obs["action_mask"][action] != 1:
             return self.last_obs, -1000, False, self.game_state.done, {}
 
-        current_eval = self.game_state.blend_eval(self.player_num)
+        current_eval = self.game_state.static_eval(self.player_num)
 
         self.game_state.take_action(action)
 
@@ -221,65 +248,107 @@ class SplendorEnv(Env):
             if self.game_state.done:
                 break
 
-            i = self.predict()
+            i = self.predict(self.game_state.current_player)
             self.game_state.take_action(i, skip_random=True)
 
 
         self.last_obs = self.get_obs()
         info = {}
 
-        new_eval = self.game_state.blend_eval(self.player_num)
+        new_eval = self.game_state.static_eval(self.player_num)
 
-        reward = (new_eval - current_eval)/30
-        return self.last_obs, reward, self.game_state.done, self.game_state.done, info
+        reward = (new_eval - current_eval)/30 * 0.01 # max static eval is 15 and min is -15 so reward can range from -1 to 1. scale it down so it doesnt compare to the end reward
 
-    def predict(self):
+        if self.game_state.done:
+            self.env_reset = True
+            if self.player_num in self.game_state.get_winner():
+                reward = 1 / len(self.game_state.get_winner())
+            else:
+                reward = -1
 
-        action_choice = [i for i, a in enumerate(self.game_state.action_mask) if a == 1]
-        i = random.choice(action_choice)
-        return i
+        #print(action, reward, self.game_state.done, self.game_state.current_player, self.player_num, self.game_state.players_turns[self.player_num])
+        if max(self.game_state.players_turns) > 100:
+            self.env_reset = True
+            print(f"TOO MANY TURNS - {[i for i in self.game_state.players_turns]} {[p.get_victory_points() for p in self.game_state.players]} \n{[self.game_state.action_list[::-1][0:10]]}")
+            reward = -1
+
+        return self.last_obs, reward, self.game_state.done, max(self.game_state.players_turns) > 100, info
+
+    def predict(self,player_num):
+
+        if player_num == self.player_num:
+            raise Exception("Player is the current player")
+        agent_num = player_num if player_num < self.player_num else player_num - 1
+        return self.agents[agent_num].predict(self)
+
+    def get_game_stats(self):
+
+        game_stats_dict = {}
+
+        if self.env_reset == True:
+
+            win_rate = 0 if len(self.games_played) == 0 else round(sum(self.games_played)/len(self.games_played),2)
+            average_turns = 0 if len(self.turns_played) == 0 else round(sum(self.turns_played)/len(self.turns_played),2)
+            last_score = 0 if len(self.games_played) == 0 else self.games_played[-1] 
+
+            game_stats_dict = {
+                'win_rate': win_rate,
+                'average_turns': average_turns,
+                'total_games': self.total_games,
+                'last_score': last_score,
+            }
+
+            total_count = 0
+            for i in self.count_action_type.keys():
+                game_stats_dict[f"action_type/{i.name}"] = self.count_action_type[i]
+                total_count += self.count_action_type[i]
+
+            for i in self.count_action_type.keys():
+                game_stats_dict[f"action_type_perc/{i.name}"] = round(self.count_action_type[i] / total_count,2)
+                self.count_action_type[i] = 0 
+
+
+            self.env_reset = False
+
+        return game_stats_dict
+
+    def is_over(self):
+        return self.game_state.done and self.player_num is not None
 
     def reset(self,seed=None, options=None):
-        #print("env reset")
+        
+        
+        if self.game_state.done:
+        
+            if len(self.games_played) >= 10:
+                self.games_played.pop(0)
 
-        
-        
-        if self.game_state.done == True and self.player_num is not None:
-            self.total_games += 1
-            won = False
-            winners = self.game_state.get_winner()
-            if self.player_num in winners:
-                if len(winners) == 1:
-                    self.games_played.append(1)
-                    won = True
-                else:
-                    self.games_played.append(1/len(winners))
+            if self.player_num in self.game_state.get_winner():
+                self.games_played.append(1/len(self.game_state.get_winner()))
             else:
                 self.games_played.append(0)
 
-            if len(self.games_played) > 250:
-                self.games_played.pop(0)
-
-            if self.total_games % 50 == 0:
-            
-                print(f"WIN RATE: {round(sum(self.games_played)/len(self.games_played)*100)}%")
+            self.turns_played.append(max(self.game_state.players_turns))
+            self.total_games += 1
 
 
+        random.seed(None)
+        self.player_num = random.choice([0,1,2,3])
+        agents = list(self.agents)
+        random.shuffle(agents)
+        self.agents = tuple(agents)
 
         random.seed(seed)
         self.seed = seed
         self.game_state.reset(seed)
-
-        self.player_num = random.choice([0,1,2,3])
 
         while self.game_state.current_player != self.player_num:
             
             if self.game_state.done:
                 break
 
-            i = self.predict()
+            i = self.predict(self.game_state.current_player)
             self.game_state.take_action(i, skip_random=True)
-
 
         self.last_obs = self.get_obs()
         return self.last_obs, {}
@@ -400,8 +469,6 @@ class Player():
 
             return self.total_purchase_amount_cache
 
-        
-
     def perc_visit_noble(self, noble):
 
         total_cost = sum(noble.noble_cost)
@@ -415,12 +482,10 @@ class Player():
 
         return calc_cost/total_cost
 
-
     def perc_buy(self, card_cost):
 
         # Get the cost of 
         pass
-
 
     def perc_buy_no_gems(self, card_cost):
 
@@ -437,11 +502,9 @@ class Player():
 
         return calc_cost/total_cost
 
-
     def can_buy_no_gems(self, card_cost):
         card_purchase_amount = self.get_card_purchase_amount()
         return all([card_purchase_amount[i] >= card_cost[i] for i in range(5)])
-
 
     def can_buy(self, card_cost):
 
@@ -619,6 +682,7 @@ class SplendorGameState():
         self.probability = 1
         self.action_list = []
         self.done = False
+        self.reset(None)
     
     def is_game_over(self):
 
@@ -733,11 +797,14 @@ class SplendorGameState():
 
         if self.is_game_over():
             return self.static_eval(player_index)
+        
+        he = self.heuristic_eval(player_index)
+        se = self.static_eval(player_index)
 
-        perc_split = (self.players_turns[player_index]-1 / max(self.players_turns[player_index]-1,25))
-        #print(1-perc_split, perc_split)
+        perc_split = (self.players_turns[player_index]-1) / max(self.players_turns[player_index]-1,25)
+        #print(he, se ,perc_split, (he * (1-perc_split)) + (se * perc_split))
 
-        return (self.heuristic_eval(player_index)) * (1-perc_split) + (self.static_eval(player_index) * perc_split)
+        return (he * (1-perc_split)) + (se * perc_split)
 
     def eval(self,start_player,turns=None,depth=10,alpha=-math.inf, beta=math.inf,prune=True):
 
@@ -995,6 +1062,7 @@ class SplendorGameState():
 
     def take_action(self, action, skip_random=True):
 
+        
         assert self.action_state != SplendorActionState.GAME_OVER
         assert self.action_state != SplendorActionState.RANDOM_CARD
         
@@ -1177,7 +1245,7 @@ class SplendorGameState():
         #print(count_actions)
         return count_actions
 
-    def get_valid_actions(self,trim_actions=True):
+    def get_valid_actions(self,trim_actions=False):
         action_mask = []
         for i in range(0, len(SPLENDOR_ACTIONS)):
             action_type, action_value = SPLENDOR_ACTIONS[i]
@@ -1249,6 +1317,7 @@ class SplendorGameState():
         self.tier_3_cards = []
         self.nobles = []
         self.count_no_action = 0
+        self.players_turns = (0,0,0,0)
 
         for i in range(4):
             self.tier_1_cards.append(self.tier_1_deck.pop())
