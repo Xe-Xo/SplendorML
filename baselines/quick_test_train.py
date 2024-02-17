@@ -39,7 +39,7 @@ def make_env(rank=0, config={}, seed=0):
     agents=(
             agent,
             agent,
-            Agent(),
+            agent,
             )
 
     def __init():

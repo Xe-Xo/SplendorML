@@ -320,7 +320,7 @@ class SplendorEnv(Env):
         
         if self.game_state.done:
         
-            if len(self.games_played) >= 10:
+            if len(self.games_played) >= 100:
                 self.games_played.pop(0)
 
             if self.player_num in self.game_state.get_winner():

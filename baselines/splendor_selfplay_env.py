@@ -51,7 +51,7 @@ class SelfPlayCallback(BaseCallback):
                 else:
                     self.i_dict[k].append(v)
 
-                if len(self.i_dict[k]) > 100:
+                if len(self.i_dict[k]) > 1000:
                     self.i_dict[k].pop(0)
 
     def _on_rollout_start(self) -> None:
@@ -63,6 +63,7 @@ class SelfPlayCallback(BaseCallback):
 
         for k in mean_dict.keys():
 
+
             self.logger.record(f"game_stats_{k}/mean", mean_dict[k])
 
             if "action_type" in k:
@@ -73,30 +74,38 @@ class SelfPlayCallback(BaseCallback):
             self.logger.record(f"game_stats_{k}/max", max_dict[k])
             #self.logger.record(f"game_stats_{k}/count", count_dict[k])
         
-        self.i_dict = {}
+        
 
         self.logger.record(f"selfplay/generation", self.generation)
 
-        if "win_rate" in mean_dict.keys():
+
+        if "last_score" in mean_dict.keys():
+
+            self.logger.record(f"selfplay/games", len(self.i_dict["last_score"]))
+            # Limit to 1000 and roll forward
+            print(len(self.i_dict["last_score"]))
+
+
 
             last_win_rate = mean_dict["last_score"]
             print(f"Average Win rate {last_win_rate}")
-            
+
+
             if last_win_rate >= BEST_THRESHOLD:
-                self.threshold_count += 1
-            else:
-                self.threshold_count = 0
-
-            if self.threshold_count > 2 or last_win_rate > 0.50: #  
-
-
                 print(f"SELFPLAY: win_rate achieved: {last_win_rate}>={BEST_THRESHOLD}")
+            
+            if last_win_rate >= BEST_THRESHOLD and len(self.i_dict["last_score"]) >= 1000:
+
                 self.generation += 1
+                print(len(self.i_dict["last_score"]))
 
                 print("SELFPLAY: new best model, bumping up generation to", self.generation)
                 self.model.save(os.path.join(LOGDIR, "best_model.zip"))
                 self.model.save(os.path.join(LOGDIR, f"history_{self.generation}.zip"))
                 self.training_env.unwrapped.env_method("reset_agents")
+
+                self.i_dict = {}
+
 
     def _on_step(self) -> bool:
         
@@ -109,10 +118,10 @@ class SelfPlayCallback(BaseCallback):
         
         dict_vector_done = [d for d, done in zip(dict_vector, done_vector) if done]
 
-        for i in dict_vector_done:
-            for j in i.keys():
-                print(f"{j}: {i[j]}")
-            print("-----")
+        # for i in dict_vector_done:
+        #     for j in i.keys():
+        #         print(f"{j}: {i[j]}")
+        #     print("-----")
 
         self.add_dicts(dict_vector_done)
         

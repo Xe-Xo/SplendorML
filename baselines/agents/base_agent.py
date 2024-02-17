@@ -93,6 +93,7 @@ class ModelAgent(Agent):
 
     def setup(self, env):
         if self.action_since_model_load > 0 or self.model is None:
+            print(f"Model not loaded, {self.action_since_model_load} actions ")
             self.load_model(env)
         else:
             print(f"Model already loaded, {self.action_since_model_load} actions since last load")
@@ -113,8 +114,10 @@ class ModelAgent(Agent):
 
         if self.model is None:
             #print("Model not loaded")
+            
             return self.get_random_action(env)
         else:
+            self.action_since_model_load += 1
             action, _ = self.model.predict(env.get_obs(), deterministic=False, action_masks=env.game_state.action_mask)
             return action
 
