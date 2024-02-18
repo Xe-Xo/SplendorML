@@ -257,7 +257,7 @@ class SplendorEnv(Env):
 
         new_eval = self.game_state.static_eval(self.player_num)
 
-        reward = (new_eval - current_eval)/30 * 0.01 # max static eval is 15 and min is -15 so reward can range from -1 to 1. scale it down so it doesnt compare to the end reward
+        reward = (new_eval - current_eval)/30 * 0.001 # max static eval is 15 and min is -15 so reward can range from -1 to 1. scale it down so it doesnt compare to the end reward
 
         if self.game_state.done:
             self.env_reset = True

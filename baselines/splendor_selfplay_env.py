@@ -12,7 +12,7 @@ import random
 import numpy as np
 
 LOGDIR = "experiments/self_play"
-BEST_THRESHOLD = 0.40 # 15% games over average win rate 25%
+BEST_THRESHOLD = 0.325 # 10% games (15% * 750 games) over average win rate 25% (250 assumed wins)
 
 def merge_dicts_by_mean(dicts):
 
@@ -59,6 +59,8 @@ class SelfPlayCallback(BaseCallback):
 
         super(SelfPlayCallback, self)._on_rollout_start()
 
+        UBEST_THRESHOLD = BEST_THRESHOLD if self.generation > 0 else 0.8
+
         mean_dict, std_dict, min_dict, max_dict = merge_dicts_by_mean(self.i_dict)
 
         for k in mean_dict.keys():
@@ -91,10 +93,10 @@ class SelfPlayCallback(BaseCallback):
             print(f"Average Win rate {last_win_rate}")
 
 
-            if last_win_rate >= BEST_THRESHOLD:
-                print(f"SELFPLAY: win_rate achieved: {last_win_rate}>={BEST_THRESHOLD}")
+            if last_win_rate >= UBEST_THRESHOLD :
+                print(f"SELFPLAY: win_rate achieved: {last_win_rate}>={UBEST_THRESHOLD}")
             
-            if last_win_rate >= BEST_THRESHOLD and len(self.i_dict["last_score"]) >= 1000:
+            if last_win_rate >= UBEST_THRESHOLD and len(self.i_dict["last_score"]) >= 1000:
 
                 self.generation += 1
                 print(len(self.i_dict["last_score"]))

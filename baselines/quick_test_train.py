@@ -35,15 +35,19 @@ def get_wrapper(env: gym.Env) -> gym.Env:
 
 def make_env(rank=0, config={}, seed=0):
 
-    agent = ModelAgent("experiments\self_play\\best_model.zip")
-    agents=(
-            agent,
-            agent,
-            agent,
-            )
+    #agent = ModelAgent("experiments\self_play\\best_model.zip")
+    #agents=(
+    #        agent,
+    #        agent,
+    #        agent,
+    #        )
 
     def __init():
-        env = SplendorEnv(agents=agents)
+        env = SplendorEnv(agents=(
+            ModelAgent("experiments\self_play\\best_model.zip"),
+            ModelAgent("experiments\self_play\\best_model.zip"),
+            ModelAgent("experiments\self_play\\best_model.zip"),    
+        ))
         #env = InvalidActionEnvDiscrete()
         env = get_wrapper(env)
 
