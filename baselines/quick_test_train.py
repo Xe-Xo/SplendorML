@@ -96,11 +96,11 @@ if __name__ == '__main__':
                                      name_prefix='splendor')
     
 
-    #tensorboard_callback = TensorboardCallback()
+    tensorboard_callback = TensorboardCallback()
 
     eval_callback = SelfPlayCallback()
 
-    callbacks = [eval_callback,checkpoint_callback]
+    callbacks = [eval_callback,checkpoint_callback,tensorboard_callback]
 
     
     learn_steps = 40
@@ -119,6 +119,6 @@ if __name__ == '__main__':
         model = MaskablePPO("MultiInputPolicy", env, verbose=1, n_steps=n_steps, batch_size=64, n_epochs=10, gamma=0.998, tensorboard_log=sess_path, ent_coef=0.01, learning_rate=0.0003, vf_coef=0.5)
 
     for i in range(learn_steps):
-        model.learn(total_timesteps=ep_length*num_cpu*1000, callback=CallbackList(callbacks))
+        model.learn(total_timesteps=ep_length*num_cpu*1000, callback=CallbackList(callbacks), progress_bar=True)
         model.save("splendor_ppo")
 

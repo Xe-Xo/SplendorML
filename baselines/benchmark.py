@@ -15,9 +15,9 @@ import time
 import random
 
 env = VisualSplendorEnv(agents=(
+    StaticEvalAgent(random_threshold=0),
     BlendedEvalAgent(random_threshold=0),
-    BlendedEvalAgent(random_threshold=0),
-    BlendedEvalAgent(random_threshold=0),
+    HeuristicEvalAgent(random_threshold=0),
     #ModelAgent("experiments\session_d86dbdba\splendor_20971520_steps.zip", random_threshold=0), 
     #ModelAgent("experiments\session_dd90eade\splendor_22544384_steps.zip", random_threshold=0),))
     ))
@@ -39,6 +39,9 @@ while games_played < 1000:
     
     action, _ = model.predict(obs, deterministic=False, action_masks=env.action_masks())
     
+    for i in range(0,60):
+        env.render()
+
     if env.action_masks()[action] == 0:
         print(f"predicted invalid action {SPLENDOR_ACTIONS[action]}")
         action = random.choice([i for i, a in enumerate(env.action_masks()) if a == 1])    

@@ -52,6 +52,9 @@ class TensorboardCallback(BaseCallback):
         dict_vector = self.training_env.unwrapped.env_method("get_game_stats")
         dict_vector_done = [d for d, done in zip(dict_vector, done_vector) if done]
 
+        for i in dict_vector_done:
+            print("Game Done! ", i["average_turns"])
+
         self.add_dicts(dict_vector_done)
         
         return True

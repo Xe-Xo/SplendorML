@@ -166,9 +166,9 @@ class SplendorEnv(Env):
         
 
 
-    #def action_masks(self) -> List[bool]:
-    #    
-    #    return [True if i == 1 else False for i in self.game_state.action_mask]
+    def action_masks(self) -> List[bool]:
+        
+        return [True if i == 1 else False for i in self.game_state.action_mask]
 
     def reset_agents(self):
         for i in self.agents:
@@ -726,6 +726,9 @@ class SplendorGameState():
 
     # TO DO BETTER EVALS
 
+
+
+
     def static_eval(self,player_index):
         ## Base Evaluation of State for Player
         # Really shitty static eval but its fast
@@ -1055,8 +1058,6 @@ class SplendorGameState():
         
 
         return random.choice(action_type_dict[best_action_type])[1]
-
-
 
     ####
 
